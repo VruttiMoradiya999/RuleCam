@@ -6,7 +6,7 @@ let session = null;
 export const loadModel = async () => {
   if (session) return true;
   try {
-    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/';
     session = await ort.InferenceSession.create('/models/yolov8n.onnx', { executionProviders: ['wasm'] });
     console.log("ONNX Model loaded!");
     return true;
