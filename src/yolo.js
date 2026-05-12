@@ -7,12 +7,19 @@ export const loadModel = async () => {
   if (session) return true;
   try {
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/';
-    ort.env.wasm.numThreads = 1; 
-    // Try WebGL first for GPU acceleration, fallback to WASM
+    
+    // Safari crashes with multi-threading due to strict SharedArrayBuffer rules.
+    // Chrome and Edge handle it fine, giving much better FPS.
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if (isSafari) {
+      ort.env.wasm.numThreads = 1; 
+    }
+
+    // WebGL lacks the 'Split' operator for YOLOv8, so we must use WASM.
     session = await ort.InferenceSession.create('/models/yolov8n.onnx', { 
-      executionProviders: ['webgl', 'wasm'] 
+      executionProviders: ['wasm'] 
     });
-    console.log("ONNX Model loaded with WebGL/WASM!");
+    console.log(`ONNX Model loaded with WASM! (Threads: ${isSafari ? 1 : 'Auto'})`);
     return true;
   } catch (e) {
     console.error("Failed to load ONNX model", e);
