@@ -1,8 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from ultralytics import YOLO
-import cv2
-import numpy as np
 import sqlite3
 import os
 from datetime import datetime
@@ -64,119 +61,10 @@ def init_db():
 
 init_db()
 
-model = YOLO("yolov8n.pt")
-
 @app.route("/", methods=["GET"])
 def health():
     """Health check endpoint."""
-    return jsonify({"status": "ok", "model": "yolov8n"})
-
-
-@app.route("/detect_signal", methods=["POST"])
-def detect_signal():
-    """Handles real-time detection for Signal Jumping."""
-    data = request.json
-    img_data = data.get("image", "")
-    if not img_data: return jsonify({"error": "No image data"}), 400
-    
-    img_bytes = base64.b64decode(img_data.split(",")[1])
-    nparr = np.frombuffer(img_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    results = model(img, imgsz=320, verbose=False)
-    violation_detected = False
-    h, w = img.shape[:2]
-    detections = []
-    
-    traffic_light_state = "unknown"
-    light_y_threshold = 0.8
-    for result in results:
-        for box in result.boxes:
-            if model.names[int(box.cls[0])] == "traffic light":
-                xyxy = box.xyxy[0].tolist()
-                lx1, ly1, lx2, ly2 = map(int, xyxy)
-                light_y_threshold = ly2 / h
-                if ly2 > ly1 and lx2 > lx1:
-                    crop = img[ly1:ly2, lx1:lx2]
-                    hsv_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-                    mask_red = cv2.addWeighted(cv2.inRange(hsv_crop, np.array([0, 70, 50]), np.array([10, 255, 255])), 1.0, cv2.inRange(hsv_crop, np.array([170, 70, 50]), np.array([180, 255, 255])), 1.0, 0)
-                    mask_yellow = cv2.inRange(hsv_crop, np.array([20, 100, 100]), np.array([30, 255, 255]))
-                    mask_green = cv2.inRange(hsv_crop, np.array([40, 50, 50]), np.array([90, 255, 255]))
-                    height = crop.shape[0]
-                    third = height // 3
-                    if third > 0:
-                        ri, yi, gi = np.sum(mask_red[0:third, :]), np.sum(mask_yellow[third:2*third, :]), np.sum(mask_green[2*third:height, :])
-                        max_i = max(ri, yi, gi)
-                        if max_i > 800:
-                            cs = "red" if ri == max_i else "yellow" if yi == max_i else "green"
-                            light_state_history.append(cs)
-                            if len(light_state_history) > HISTORY_SIZE: light_state_history.pop(0)
-                    if light_state_history:
-                        from collections import Counter
-                        traffic_light_state = Counter(light_state_history).most_common(1)[0][0]
-
-    for result in results:
-        for box in result.boxes:
-            name = model.names[int(box.cls[0])]
-            if name in ["car", "motorcycle", "bus", "truck", "traffic light"]:
-                conf = float(box.conf[0])
-                xyxy = box.xyxy[0].tolist()
-                is_violating = False
-                if name != "traffic light" and conf > 0.45 and traffic_light_state in ["red", "yellow"]:
-                    if (xyxy[3]/h) > light_y_threshold and (xyxy[1]/h) < light_y_threshold + 0.1:
-                        is_violating = True
-                        violation_detected = True
-                detections.append({
-                    "bbox": [round(c, 1) for c in xyxy],
-                    "object": name,
-                    "confidence": round(conf, 2),
-                    "is_violating": is_violating,
-                    "light_state": traffic_light_state if name == "traffic light" else None
-                })
-    return jsonify({"detections": detections, "image_shape": [h, w], "violation_detected": violation_detected, "traffic_light_state": traffic_light_state})
-
-
-@app.route("/detect_triple", methods=["POST"])
-def detect_triple():
-    """Handles real-time detection for Triple Riding."""
-    data = request.json
-    img_data = data.get("image", "")
-    if not img_data: return jsonify({"error": "No image data"}), 400
-    
-    img_bytes = base64.b64decode(img_data.split(",")[1])
-    nparr = np.frombuffer(img_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    results = model(img, imgsz=320, verbose=False)
-    violation_detected = False
-    h, w = img.shape[:2]
-    detections = []
-    
-    persons, motorcycles = [], []
-    for result in results:
-        for box in result.boxes:
-            name = model.names[int(box.cls[0])]
-            conf = float(box.conf[0])
-            if conf < 0.3: continue
-            xyxy = box.xyxy[0].tolist()
-            if name == "person": persons.append(xyxy)
-            elif name == "motorcycle": motorcycles.append({"box": xyxy, "conf": conf, "people_count": 0})
-    
-    for bike in motorcycles:
-        bx1, by1, bx2, by2 = bike["box"]
-        for px1, py1, px2, py2 in persons:
-            p_cx, p_cy = (px1 + px2) / 2, (py1 + py2) / 2
-            if bx1-20 <= p_cx <= bx2+20 and by1-50 <= p_cy <= by2+20: bike["people_count"] += 1
-        is_violating = bike["people_count"] >= 3
-        if is_violating: violation_detected = True
-        detections.append({
-            "bbox": [round(c, 1) for c in bike["box"]],
-            "object": f"Motorcycle ({bike['people_count']} riders)",
-            "confidence": round(bike["conf"], 2),
-            "is_violating": is_violating
-        })
-    for p in persons:
-        detections.append({"bbox": [round(c, 1) for c in p], "object": "person", "confidence": 0.5, "is_violating": False})
-        
-    return jsonify({"detections": detections, "image_shape": [h, w], "violation_detected": violation_detected, "traffic_light_state": "N/A"})
+    return jsonify({"status": "ok", "backend": "lightweight"})
 
 
 def process_videodb_workflow(file_path, record_id):

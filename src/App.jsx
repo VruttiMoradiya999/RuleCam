@@ -1,5 +1,6 @@
 import * as React from 'react';
 import './App.css';
+import { loadModel, detectObjects, processSignalViolations, processTripleRiding } from './yolo';
 const { useEffect, useRef, useState, useCallback } = React;
 
 const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5005";
@@ -29,7 +30,7 @@ const App = () => {
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
 
-  // Check backend health
+  // Check backend health and load model
   useEffect(() => {
     const checkBackend = async () => {
       try {
@@ -46,6 +47,10 @@ const App = () => {
     };
     checkBackend();
     const hInterval = setInterval(checkBackend, 5000);
+    
+    // Load YOLO Model
+    loadModel();
+
     return () => clearInterval(hInterval);
   }, []);
 
@@ -151,33 +156,30 @@ const App = () => {
     });
   }, []);
 
+  // Global state for temporal smoothing
+  const lightStateHistoryRef = useRef([]);
+
   // Capture and Detect Signal Jumping
   const captureAndDetectSignal = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (video.readyState < 2) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    
     const startTime = performance.now();
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/detect_signal`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: imageData }),
-      });
-      if (!res.ok) throw new Error('Detection failed');
-      const data = await res.json();
-      setDetections(data.detections || []);
-      setIsViolationFound(data.violation_detected || false);
-      setLightState(data.traffic_light_state || "unknown");
+      let rawDetections = await detectObjects(canvas, video);
+      
+      const { detections: finalDetections, violationDetected, trafficLightState } = processSignalViolations(rawDetections, video, lightStateHistoryRef.current);
+      
+      setDetections(finalDetections || []);
+      setIsViolationFound(violationDetected || false);
+      setLightState(trafficLightState || "unknown");
+      
       const elapsed = performance.now() - startTime;
       setFps(Math.round(1000 / elapsed));
-      drawOverlay(data.detections || [], data.image_shape, data.violation_detected, data.traffic_light_state);
+      drawOverlay(finalDetections || [], [video.videoHeight, video.videoWidth], violationDetected, trafficLightState);
     } catch (err) {
       console.error("Signal detection error:", err);
     }
@@ -189,27 +191,20 @@ const App = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (video.readyState < 2) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    
     const startTime = performance.now();
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/detect_triple`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: imageData }),
-      });
-      if (!res.ok) throw new Error('Detection failed');
-      const data = await res.json();
-      setDetections(data.detections || []);
-      setIsViolationFound(data.violation_detected || false);
+      let rawDetections = await detectObjects(canvas, video);
+      const { detections: finalDetections, violationDetected } = processTripleRiding(rawDetections);
+      
+      setDetections(finalDetections || []);
+      setIsViolationFound(violationDetected || false);
       setLightState("N/A");
+      
       const elapsed = performance.now() - startTime;
       setFps(Math.round(1000 / elapsed));
-      drawOverlay(data.detections || [], data.image_shape, data.violation_detected, "N/A");
+      drawOverlay(finalDetections || [], [video.videoHeight, video.videoWidth], violationDetected, "N/A");
     } catch (err) {
       console.error("Triple detection error:", err);
     }
