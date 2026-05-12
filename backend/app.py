@@ -82,7 +82,7 @@ def detect_signal():
     img_bytes = base64.b64decode(img_data.split(",")[1])
     nparr = np.frombuffer(img_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    results = model(img)
+    results = model(img, imgsz=320, verbose=False)
     violation_detected = False
     h, w = img.shape[:2]
     detections = []
@@ -145,7 +145,7 @@ def detect_triple():
     img_bytes = base64.b64decode(img_data.split(",")[1])
     nparr = np.frombuffer(img_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    results = model(img)
+    results = model(img, imgsz=320, verbose=False)
     violation_detected = False
     h, w = img.shape[:2]
     detections = []

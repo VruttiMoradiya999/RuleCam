@@ -2,7 +2,8 @@ import * as React from 'react';
 import './App.css';
 const { useEffect, useRef, useState, useCallback } = React;
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5005";
+const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5005";
+const BACKEND_URL = rawBackendUrl.replace(/\/$/, "");
 
 const App = () => {
   const videoRef = useRef(null);
