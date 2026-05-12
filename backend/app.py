@@ -155,16 +155,37 @@ def detect_triple():
         for box in result.boxes:
             name = model.names[int(box.cls[0])]
             conf = float(box.conf[0])
-            if conf < 0.3: continue
+            if conf < 0.25: continue # Lower threshold to catch small people
             xyxy = box.xyxy[0].tolist()
             if name == "person": persons.append(xyxy)
             elif name == "motorcycle": motorcycles.append({"box": xyxy, "conf": conf, "people_count": 0})
     
+    for p in persons:
+        px1, py1, px2, py2 = p
+        p_area = (px2 - px1) * (py2 - py1)
+        best_bike = None
+        max_overlap = 0
+        
+        for i, bike in enumerate(motorcycles):
+            bx1, by1, bx2, by2 = bike["box"]
+            # Intersection (allow person to be slightly above and around the bike)
+            ix1 = max(px1, bx1 - 20)
+            iy1 = max(py1, by1 - 60)
+            ix2 = min(px2, bx2 + 20)
+            iy2 = min(py2, by2 + 20)
+            
+            if ix1 < ix2 and iy1 < iy2:
+                i_area = (ix2 - ix1) * (iy2 - iy1)
+                overlap_ratio = i_area / p_area
+                if overlap_ratio > max_overlap:
+                    max_overlap = overlap_ratio
+                    best_bike = i
+                    
+        # Assign person to the bike they overlap with the most
+        if best_bike is not None and max_overlap > 0.35:
+            motorcycles[best_bike]["people_count"] += 1
+
     for bike in motorcycles:
-        bx1, by1, bx2, by2 = bike["box"]
-        for px1, py1, px2, py2 in persons:
-            p_cx, p_cy = (px1 + px2) / 2, (py1 + py2) / 2
-            if bx1-20 <= p_cx <= bx2+20 and by1-50 <= p_cy <= by2+20: bike["people_count"] += 1
         is_violating = bike["people_count"] >= 3
         if is_violating: violation_detected = True
         detections.append({
