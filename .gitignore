@@ -51,6 +51,7 @@ backend/.env
 # AI/ML
 *.pt
 *.onnx
+!public/models/*.onnx
 backend/violations/*
 !backend/violations/.gitkeep
 
