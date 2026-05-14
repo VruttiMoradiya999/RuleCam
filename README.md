@@ -1,18 +1,32 @@
 # RuleCam
 
-RuleCam is a real-time object detection application powered by YOLOv8 and React.
+RuleCam is a real-time object detection application powered by YOLOv8, React, and VideoDB.
 
 ## Features
 
 - **Real-time Detection**: Captures camera frames and identifies objects using YOLOv8.
-- **Dynamic Overlays**: Renders bounding boxes and confidence scores directly over the video feed.
-- **Modern UI**: Sleek dark-mode interface with live stats (FPS, object count).
-- **Dual Camera Support**: Switch between front and back cameras easily.
+- **Dynamic Overlays**: Renders bounding boxes and detections directly over the video feed.
+- **Modern UI**: Clean, neo-brutalist light-theme interface.
+- **VideoDB AI Integration**: Upload traffic violation videos and have them analyzed by AI to detect rule-breaking and vehicle details.
+
+## Screenshots
+
+### 1. Live Monitor View
+![Live Monitor](images/live_monitor_placeholder.png)
+*The main view where real-time video is captured and analyzed.*
+
+### 2. Violation History
+![Violations History](images/violations_placeholder.png)
+*Review past violations with detailed AI analysis and playback options.*
+
+### 3. AI Chatbot Analysis
+![AI Chatbot](images/chatbot_placeholder.png)
+*Upload a video directly for VideoDB AI to process.*
 
 ## Tech Stack
 
 - **Frontend**: React, Vite, Vanilla CSS
-- **Backend**: Flask, YOLOv8 (Ultralytics), OpenCV, NumPy
+- **Backend**: Flask, YOLOv8 (Ultralytics), OpenCV, SQLite, VideoDB
 
 ## Getting Started
 
@@ -22,7 +36,20 @@ RuleCam is a real-time object detection application powered by YOLOv8 and React.
 - Python 3.9+
 - pip
 
-### 2. Backend Setup
+### 2. Environment Variables
+
+Create a `.env` file in the **backend** directory:
+```env
+VIDEODB_API_KEY=your_videodb_api_key_here
+PORT=5005
+```
+
+Create a `.env` file in the **root** directory (for Frontend):
+```env
+VITE_BACKEND_URL=http://localhost:5005
+```
+
+### 3. Backend Setup
 
 ```bash
 cd backend
@@ -32,7 +59,7 @@ python app.py
 
 The backend will start on `http://localhost:5005`.
 
-### 3. Frontend Setup
+### 4. Frontend Setup
 
 ```bash
 # From the root directory
@@ -44,10 +71,6 @@ The frontend will start on `http://localhost:5173`.
 
 ## Troubleshooting
 
-- **Port Conflicts**: If port `5005` is in use, you can change it in `backend/app.py` and `src/App.jsx`.
+- **Port Conflicts**: If port `5005` is in use, you can change it in `backend/.env` and `.env`.
 - **Camera Permissions**: Ensure you grant camera access to the browser when prompted.
-- **CORS Issues**: The backend is configured to allow requests from `http://localhost:5173`. If your frontend runs on a different port, update the `origins` list in `backend/app.py`.
-
-## License
-
-MIT
+- **CORS Issues**: The backend is configured to allow requests from `*`. If your frontend runs on a different port, update the `origins` list in `backend/app.py`.
