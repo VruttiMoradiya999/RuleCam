@@ -1,55 +1,65 @@
-# RuleCam
+# RuleCam 🚦
 
-RuleCam is a real-time object detection application powered by YOLOv8, React, and VideoDB.
+RuleCam is a state-of-the-art automated traffic violation detection system. It leverages **YOLOv8** for real-time computer vision and **VideoDB** for sophisticated AI-driven confirmation and analysis.
 
-## Features
+---
 
-- **Real-time Detection**: Captures camera frames and identifies objects using YOLOv8.
-- **Dynamic Overlays**: Renders bounding boxes and detections directly over the video feed.
-- **Modern UI**: Clean, neo-brutalist light-theme interface.
-- **VideoDB AI Integration**: Upload traffic violation videos and have them analyzed by AI to detect rule-breaking and vehicle details.
+## 📸 Overview
 
-## Screenshots
+<div align="center">
+  <h3>1. Real-Time Monitor</h3>
+  <img src="src/assets/1.PNG" alt="Live Monitor" width="800">
+  <p><i>Real-time vehicle detection and violation tracking using YOLOv8.</i></p>
 
-### 1. Live Monitor View
-![Live Monitor](src/assests/1.PNG)
-*The main view where real-time video is captured and analyzed.*
+  <br/>
 
-### 2. Violation History
-![Violations History](src/assests/2.PNG)
-*Review past violations with detailed AI analysis and playback options.*
+  <h3>2. Violation History & Analytics</h3>
+  <img src="src/assets/2.PNG" alt="Violations History" width="800">
+  <p><i>Comprehensive history of detected violations with AI-generated evidence.</i></p>
 
-### 3. AI Chatbot Analysis
-![AI Chatbot](src/assests/3.PNG)
-*Upload a video directly for VideoDB AI to process.*
+  <br/>
 
-## Tech Stack
+  <h3>3. AI-Powered Confirmation</h3>
+  <img src="src/assets/3.PNG" alt="AI Analysis" width="800">
+  <p><i>VideoDB integration providing high-accuracy confirmation and reasoning.</i></p>
+</div>
 
-- **Frontend**: React, Vite, Vanilla CSS
-- **Backend**: Flask, YOLOv8 (Ultralytics), OpenCV, SQLite, VideoDB
+---
 
-## Getting Started
+## 🚀 Key Features
 
-### 1. Prerequisites
+- **End-to-End Automation**: From real-time detection to AI-confirmed reports.
+- **YOLOv8 Integration**: High-speed, high-accuracy object detection for vehicles and traffic lights.
+- **VideoDB AI Arbiter**: Uses advanced LLMs to analyze video scenes and confirm violations with human-like reasoning.
+- **Interactive AI Chat**: Chat directly with any violation video to ask specific questions about the event.
+- **Neo-Brutalist UI**: A clean, modern, and highly responsive dashboard.
 
-- Node.js (v18+)
-- Python 3.9+
-- pip
+---
 
-### 2. Environment Variables
+## 🛠️ Tech Stack
+
+- **Frontend**: React, Vite, CSS3 (Vanilla)
+- **Backend**: Python, Flask, OpenCV, SQLite
+- **AI/ML**: Ultralytics YOLOv8, VideoDB API
+
+---
+
+## ⚙️ Getting Started
+
+### 1. Environment Configuration
 
 Create a `.env` file in the **backend** directory:
 ```env
-VIDEODB_API_KEY=your_videodb_api_key_here
+VIDEODB_API_KEY=your_videodb_api_key
 PORT=5005
 ```
 
-Create a `.env` file in the **root** directory (for Frontend):
+Create a `.env` file in the **root** directory:
 ```env
 VITE_BACKEND_URL=http://localhost:5005
 ```
 
-### 3. Backend Setup
+### 2. Backend Installation
 
 ```bash
 cd backend
@@ -57,20 +67,15 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The backend will start on `http://localhost:5005`.
-
-### 4. Frontend Setup
+### 3. Frontend Installation
 
 ```bash
-# From the root directory
 npm install
 npm run dev
 ```
 
-The frontend will start on `http://localhost:5173`.
+---
 
-## Troubleshooting
+## 🛡️ License
 
-- **Port Conflicts**: If port `5005` is in use, you can change it in `backend/.env` and `.env`.
-- **Camera Permissions**: Ensure you grant camera access to the browser when prompted.
-- **CORS Issues**: The backend is configured to allow requests from `*`. If your frontend runs on a different port, update the `origins` list in `backend/app.py`.
+RuleCam is developed for advanced traffic monitoring and safety enforcement.
