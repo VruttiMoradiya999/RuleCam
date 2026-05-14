@@ -555,3 +555,34 @@
   font-weight: bold;
   border: 1.5px solid var(--border-color);
 }
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  border: 1.5px solid var(--border-color);
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.status-badge[data-status="Confirmed"] {
+  background: var(--red);
+  color: white;
+}
+.status-badge[data-status="No Violation"] {
+  background: #4ade80;
+  color: black;
+}
+.status-badge[data-status="Pending"] {
+  background: #fef08a;
+  color: black;
+}
+
+.video-chat-section {
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

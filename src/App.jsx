@@ -39,6 +39,11 @@ const App = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isMessageOpen, setIsMessageOpen] = useState(false);
+  
+  // Specific Video Chat States
+  const [videoChats, setVideoChats] = useState({});
+  const [chatInputs, setChatInputs] = useState({});
+  const [isVideoChatting, setIsVideoChatting] = useState({});
 
   const notifications = [
     { id: 1, title: 'New Signal Violation', desc: 'A vehicle crossed red light at intersection 4', time: '2m ago' },
@@ -79,11 +84,28 @@ const App = () => {
           const vData = await vRes.json();
           const record = vData.find(v => v.id === recordId);
           
-          if (record && record.ai_analysis) {
-            setChatMessages(prev => [...prev, { sender: 'bot', text: `Analysis Complete: ${record.ai_analysis}` }]);
+          if (record && record.ai_analysis && record.status !== 'Pending') {
+            console.log(`[VideoDB Process] Final Status: ${record.status} - ${record.ai_analysis}`);
+            if (record.status === 'Confirmed') {
+              setChatMessages(prev => [...prev, { sender: 'bot', text: `Analysis Complete: Violation Confirmed! ${record.ai_analysis}` }]);
+            } else {
+              setChatMessages(prev => [...prev, { sender: 'bot', text: `Analysis Complete: AI did not confirm a violation.` }]);
+            }
             clearInterval(pollInterval);
             setIsUploading(false);
             fetchViolations(); // refresh history
+          } else if (record && record.ai_analysis && record.ai_analysis !== "Processing") {
+            console.log(`[VideoDB Process] ${record.ai_analysis}`);
+            setChatMessages(prev => {
+              const newMsgs = [...prev];
+              const lastMsg = newMsgs[newMsgs.length - 1];
+              if (lastMsg.sender === 'bot' && lastMsg.isProgress) {
+                lastMsg.text = record.ai_analysis;
+              } else {
+                newMsgs.push({ sender: 'bot', text: record.ai_analysis, isProgress: true });
+              }
+              return newMsgs;
+            });
           }
         }, 5000);
       } else {
@@ -445,7 +467,38 @@ const App = () => {
   };
 
   const toggleCamera = () => {
-    setFacingMode(prev => (prev === "user" ? "environment" : "user"));
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+  };
+
+  const handleVideoChat = async (videoId) => {
+    if (!chatInputs[videoId]) return;
+    const question = chatInputs[videoId];
+    
+    setVideoChats(prev => ({
+      ...prev,
+      [videoId]: [...(prev[videoId] || []), { sender: 'user', text: question }]
+    }));
+    setChatInputs(prev => ({ ...prev, [videoId]: '' }));
+    setIsVideoChatting(prev => ({ ...prev, [videoId]: true }));
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/chat_with_video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId, question })
+      });
+      const data = await res.json();
+      setVideoChats(prev => ({
+        ...prev,
+        [videoId]: [...prev[videoId], { sender: 'bot', text: data.answer || data.error }]
+      }));
+    } catch (err) {
+      setVideoChats(prev => ({
+        ...prev,
+        [videoId]: [...prev[videoId], { sender: 'bot', text: 'Failed to reach AI.' }]
+      }));
+    }
+    setIsVideoChatting(prev => ({ ...prev, [videoId]: false }));
   };
 
   return (
@@ -626,7 +679,7 @@ const App = () => {
                 <div className="empty-state">No violations recorded yet.</div>
               ) : (
                 violations.map((v, idx) => {
-                  const isVideo = v.video_path && v.video_path.endsWith('.webm');
+                  const isVideo = (v.video_path && v.video_path.endsWith('.webm')) || (v.video_path && v.video_path.endsWith('.mp4'));
                   const mediaUrl = v.video_path ? `${BACKEND_URL}/violations/${v.video_path.split('/').pop()}` : null;
                   
                   let dateStr = v.timestamp;
@@ -635,31 +688,79 @@ const App = () => {
                   } catch(e){}
 
                   return (
-                    <div className="result-card" key={v.id}>
+                    <div key={v.id || idx} className="result-card">
                       <div className="result-card-header">
                         <div className="result-logo">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                          <span>{v.vehicle_type}</span>
+                          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                          <span>{v.type}</span>
                         </div>
-                        <button className="info-btn" onClick={() => deleteViolation(v.id)} title="Delete Record">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div className="status-badge" data-status={v.status}>{v.status}</div>
+                          <button className="info-btn" onClick={() => deleteViolation(v.id)} title="Delete Record">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          </button>
+                        </div>
                       </div>
 
+                      {v.videodb_url ? (
+                        <iframe src={v.videodb_url} className="media-preview" title="VideoDB Stream" frameBorder="0" allowFullScreen></iframe>
+                      ) : isVideo && mediaUrl ? (
+                        <video src={mediaUrl} className="media-preview" controls></video>
+                      ) : mediaUrl ? (
+                        <img src={mediaUrl} alt="Violation" className="media-preview" />
+                      ) : (
+                        <div className="media-preview" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)'}}>
+                          No media available
+                        </div>
+                      )}
+
                       <div className="result-card-body">
-                        <h3 className="result-title">
-                          {v.type}
-                          {idx === 0 && <span className="new-badge">New</span>}
-                        </h3>
-                        <span className="result-date">{dateStr}</span>
+                        <div>
+                          <div className="result-title">
+                            {v.location || 'Camera 1'}
+                            {idx === 0 && <span className="new-badge">New</span>}
+                          </div>
+                          <div className="result-date">{dateStr}</div>
+                        </div>
                       </div>
                       
-                      {mediaUrl && (
-                        isVideo ? (
-                          <video className="media-preview" src={mediaUrl} controls autoPlay muted loop />
-                        ) : (
-                          <img className="media-preview" src={mediaUrl} alt="Violation" />
-                        )
+                      {v.ai_analysis && v.status === 'Pending' && (
+                        <div style={{fontSize: '13px', color: 'var(--text-secondary)'}}>
+                          <em>Progress: {v.ai_analysis}</em>
+                        </div>
+                      )}
+
+                      <div className="action-row">
+                        <button className="card-btn" onClick={() => window.open(v.videodb_url || mediaUrl, '_blank')}>View Full</button>
+                        {v.videodb_id && (
+                          <button className="card-btn" style={{background: 'var(--blue)', color: 'white'}} onClick={() => {
+                            setVideoChats(prev => ({...prev, [v.videodb_id]: prev[v.videodb_id] || [{sender: 'bot', text: 'Ask me anything about this video!'}]}));
+                          }}>
+                            Chat with AI
+                          </button>
+                        )}
+                      </div>
+                      
+                      {v.videodb_id && videoChats[v.videodb_id] && (
+                        <div className="video-chat-section">
+                          <div className="chat-messages" style={{height: '200px'}}>
+                            {videoChats[v.videodb_id].map((msg, i) => (
+                              <div key={i} className={`message ${msg.sender}`}>{msg.text}</div>
+                            ))}
+                            {isVideoChatting[v.videodb_id] && <div className="message bot">Thinking...</div>}
+                          </div>
+                          <div className="chat-input-area">
+                            <input 
+                              type="text" 
+                              style={{flex: 1, padding: '8px', border: '1.5px solid var(--border-color)', borderRadius: 'var(--radius-md)'}}
+                              value={chatInputs[v.videodb_id] || ''} 
+                              onChange={(e) => setChatInputs(prev => ({...prev, [v.videodb_id]: e.target.value}))} 
+                              placeholder="Ask about this clip..."
+                              onKeyDown={(e) => e.key === 'Enter' && handleVideoChat(v.videodb_id)}
+                            />
+                            <button onClick={() => handleVideoChat(v.videodb_id)} className="upload-btn" style={{flex: 'none', width: 'auto'}}>Send</button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
