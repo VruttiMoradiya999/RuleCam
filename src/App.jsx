@@ -37,6 +37,18 @@ const App = () => {
   const fileInputRef = useRef(null);
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isMessageOpen, setIsMessageOpen] = useState(false);
+
+  const notifications = [
+    { id: 1, title: 'New Signal Violation', desc: 'A vehicle crossed red light at intersection 4', time: '2m ago' },
+    { id: 2, title: 'System Update', desc: 'AI model updated to v2.4', time: '1h ago' }
+  ];
+
+  const messages = [
+    { id: 1, sender: 'Admin', text: 'Please review the latest reports.', time: '10:00 AM' },
+    { id: 2, sender: 'Support', text: 'Server maintenance scheduled for tonight.', time: 'Yesterday' }
+  ];
 
   // Chatbot File Upload Logic
   const handleFileUpload = async (event) => {
@@ -441,7 +453,7 @@ const App = () => {
       <header className="desktop-header">
         <div className="header-content">
           <div className="header-left">
-            <h1 className="app-title">GuardLane</h1>
+            <h1 className="app-title">RuleCam</h1>
           </div>
           
           <div className="filter-pills desktop-only">
@@ -453,13 +465,46 @@ const App = () => {
             <button className="icon-btn mobile-menu-btn" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
             </button>
-            <button className="icon-btn">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8 A6 6 0 0 0 6 8 c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-              <span className="badge">2</span>
-            </button>
-            <button className="icon-btn">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            </button>
+            <div className="dropdown-wrapper">
+              <button className="icon-btn" onClick={() => { setIsNotifOpen(!isNotifOpen); setIsMessageOpen(false); }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8 A6 6 0 0 0 6 8 c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span className="badge">2</span>
+              </button>
+              {isNotifOpen && (
+                <div className="popover-dropdown">
+                  <div className="popover-header">Notifications</div>
+                  <div className="popover-content">
+                    {notifications.map(n => (
+                      <div key={n.id} className="popover-item">
+                        <div className="popover-title">{n.title}</div>
+                        <div className="popover-desc">{n.desc}</div>
+                        <div className="popover-time">{n.time}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="dropdown-wrapper">
+              <button className="icon-btn" onClick={() => { setIsMessageOpen(!isMessageOpen); setIsNotifOpen(false); }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              </button>
+              {isMessageOpen && (
+                <div className="popover-dropdown">
+                  <div className="popover-header">Messages</div>
+                  <div className="popover-content">
+                    {messages.map(m => (
+                      <div key={m.id} className="popover-item">
+                        <div className="popover-title">{m.sender}</div>
+                        <div className="popover-desc">{m.text}</div>
+                        <div className="popover-time">{m.time}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
