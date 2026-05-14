@@ -12,15 +12,15 @@ RuleCam is a real-time object detection application powered by YOLOv8, React, an
 ## Screenshots
 
 ### 1. Live Monitor View
-![Live Monitor](assests/1.PNG)
+![Live Monitor](src/assests/1.PNG)
 *The main view where real-time video is captured and analyzed.*
 
 ### 2. Violation History
-![Violations History](assests/2.PNG)
+![Violations History](src/assests/2.PNG)
 *Review past violations with detailed AI analysis and playback options.*
 
 ### 3. AI Chatbot Analysis
-![AI Chatbot](assests/3.PNG)
+![AI Chatbot](src/assests/3.PNG)
 *Upload a video directly for VideoDB AI to process.*
 
 ## Tech Stack
