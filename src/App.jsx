@@ -29,6 +29,62 @@ const App = () => {
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
 
+  // Chatbot State
+  const [chatMessages, setChatMessages] = useState([
+    { sender: 'bot', text: "Hello! Upload a video of a traffic violation, and our VideoDB AI will analyze it to detect the vehicle and the rules broken." }
+  ]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Chatbot File Upload Logic
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setChatMessages(prev => [...prev, { sender: 'user', text: `Uploaded: ${file.name}` }]);
+    setIsUploading(true);
+
+    const formData = new FormData();
+    formData.append('media', file);
+    formData.append('type', "Manual VideoDB Upload");
+
+    try {
+      setChatMessages(prev => [...prev, { sender: 'bot', text: "Uploading and processing with VideoDB AI... This might take a minute." }]);
+      
+      const res = await fetch(`${BACKEND_URL}/report_violation`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        const recordId = data.id;
+        // Poll for AI analysis
+        const pollInterval = setInterval(async () => {
+          const vRes = await fetch(`${BACKEND_URL}/violations`);
+          const vData = await vRes.json();
+          const record = vData.find(v => v.id === recordId);
+          
+          if (record && record.ai_analysis) {
+            setChatMessages(prev => [...prev, { sender: 'bot', text: `Analysis Complete: ${record.ai_analysis}` }]);
+            clearInterval(pollInterval);
+            setIsUploading(false);
+            fetchViolations(); // refresh history
+          }
+        }, 5000);
+      } else {
+        setChatMessages(prev => [...prev, { sender: 'bot', text: "Sorry, upload failed." }]);
+        setIsUploading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { sender: 'bot', text: "An error occurred during upload." }]);
+      setIsUploading(false);
+    }
+  };
+
   // Check backend health
   useEffect(() => {
     const checkBackend = async () => {
@@ -381,38 +437,45 @@ const App = () => {
   };
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <div className="header-left">
-          <div className="logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <div>
+    <div className="desktop-app">
+      <header className="desktop-header">
+        <div className="header-content">
+          <div className="header-left">
             <h1 className="app-title">GuardLane</h1>
-            <p className="app-subtitle">Smart Signal Guard</p>
           </div>
-        </div>
+          
+          <div className="filter-pills desktop-only">
+            <button className={`pill ${activeTab === 'live' ? 'active' : ''}`} onClick={() => setActiveTab('live')}>Live Monitor</button>
+            <button className={`pill ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>Violations</button>
+          </div>
 
-        <nav className="header-nav">
-          <button className={`nav-link ${activeTab === 'live' ? 'active' : ''}`} onClick={() => setActiveTab('live')}>Live</button>
-          <button className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>History</button>
-        </nav>
-
-        <div className="header-right">
-          <div className={`status-badge ${backendStatus}`}>
-            <span className="status-dot"></span>
-            {backendStatus === "connected" ? "AI Online" : "AI Offline"}
+          <div className="header-actions">
+            <button className="icon-btn mobile-menu-btn" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <button className="icon-btn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8 A6 6 0 0 0 6 8 c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              <span className="badge">2</span>
+            </button>
+            <button className="icon-btn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="main-content">
+      {isMobileMenuOpen && (
+        <div className="mobile-dropdown">
+          <button className={`pill ${activeTab === 'live' ? 'active' : ''}`} onClick={() => {setActiveTab('live'); setIsMobileMenuOpen(false);}}>Live Monitor</button>
+          <button className={`pill ${activeTab === 'history' ? 'active' : ''}`} onClick={() => {setActiveTab('history'); setIsMobileMenuOpen(false);}}>Violations</button>
+        </div>
+      )}
+
+      <main className="desktop-content">
         {activeTab === 'live' ? (
-          <>
-            <div className="video-section">
-              <div className="video-wrapper">
+          <div className="live-container">
+            <div className="live-left">
+              <div className="video-card">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -428,154 +491,131 @@ const App = () => {
                 />
 
                 {isMonitoringSignal && (
-                  <div className={`light-indicator ${lightState}`}>
-                    <div className="indicator-dot"></div>
-                    <span>{lightState.toUpperCase()} SIGNAL</span>
+                  <div className="light-indicator">
+                    {lightState.toUpperCase()} SIGNAL
                   </div>
                 )}
 
                 {(isMonitoringSignal || isMonitoringTriple) && (
                   <div className="stats-overlay">
-                    <div className="stat-chip">
-                      <span className="stat-label">FPS</span>
-                      <span className="stat-value">{fps}</span>
-                    </div>
+                    FPS {fps}
+                  </div>
+                )}
+
+                {isViolationFound && (
+                  <div className="violation-alert">
+                    Recording Evidence...
                   </div>
                 )}
               </div>
 
-              <div className="mode-selector">
-                <button
-                  className={`start-btn ${isMonitoringSignal ? 'active' : ''}`}
-                  onClick={toggleSignalMonitoring}
-                >
-                  {isMonitoringSignal ? 'Stop Signal Monitor' : 'Start Signal Monitor'}
-                </button>
-                <button
-                  className={`start-btn ${isMonitoringTriple ? 'active' : ''}`}
-                  onClick={toggleTripleMonitoring}
-                >
-                  {isMonitoringTriple ? 'Stop Triple Monitor' : 'Start Triple Monitor'}
-                </button>
-              </div>
-
-              <div className="camera-controls">
-                <button className="cam-btn" onClick={toggleCamera}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
-                </button>
-              </div>
-
-
-              {isViolationFound && (
-                <div className="violation-alert auto">
-                  <div className="alert-content">
-                    <div className="recording-dot"></div>
-                    <span>Recording Evidence...</span>
-                  </div>
+              <div className="action-buttons">
+                <div className="action-row">
+                  <button
+                    className={`card-btn ${isMonitoringSignal ? 'active' : ''}`}
+                    onClick={toggleSignalMonitoring}
+                  >
+                    {isMonitoringSignal ? 'Stop Signal' : 'Start Signal'}
+                  </button>
+                  <button
+                    className={`card-btn ${isMonitoringTriple ? 'active' : ''}`}
+                    onClick={toggleTripleMonitoring}
+                  >
+                    {isMonitoringTriple ? 'Stop Triple' : 'Start Triple'}
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
 
-            <div className="detections-panel">
-              <div className="panel-header">
-                <h2>Live Objects</h2>
-                {detections.length > 0 && <span className="detection-count">{detections.length}</span>}
+            <div className="chatbot-section">
+              <div className="chat-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                VideoDB AI Assistant
               </div>
-
-              <div className="detection-list">
-                {detections.length === 0 ? (
-                  <div className="empty-state">
-                    <p>{(isMonitoringSignal || isMonitoringTriple) ? "Scanning..." : "Ready to monitor"}</p>
+              <div className="chat-messages">
+                {chatMessages.map((msg, idx) => (
+                  <div key={idx} className={`message ${msg.sender}`}>
+                    {msg.text}
                   </div>
-                ) : (
-                  detections.map((det, idx) => (
-                    <div className={`detection-item ${det.is_violating ? 'violating' : ''}`} key={idx}>
-                      <div className="det-info">
-                        <span className="det-name">{det.object}</span>
-                        <div className="conf-bar-bg"><div className="conf-bar-fill" style={{ width: `${det.confidence * 100}%` }}></div></div>
-                      </div>
-                      <span className="conf-text">{(det.confidence * 100).toFixed(0)}%</span>
-                    </div>
-                  ))
+                ))}
+                {isUploading && (
+                  <div className="message bot" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', background: 'var(--teal)', borderRadius: '50%', animation: 'pulse-detect 1s infinite' }}></span> Analyzing...
+                  </div>
                 )}
               </div>
+              <div className="chat-input-area">
+                <input 
+                  type="file" 
+                  accept="video/*,image/*" 
+                  style={{ display: 'none' }} 
+                  ref={fileInputRef}
+                  onChange={handleFileUpload} 
+                />
+                <button 
+                  className="upload-btn" 
+                  onClick={() => fileInputRef.current.click()}
+                  disabled={isUploading}
+                  style={{ opacity: isUploading ? 0.7 : 1 }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  Upload Violation Video
+                </button>
+              </div>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="history-section">
-            <div className="history-summary">
-              <div className="summary-card">
-                <span className="summary-label">Total Reports</span>
-                <span className="summary-value">{violations.length}</span>
+          <div className="history-container">
+            <div className="controls-bar">
+              <div className="dropdown-style">
+                <span>Show latest first</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </div>
-              <div className="summary-card">
-                <span className="summary-label">Potential Rewards</span>
-                <span className="summary-value text-green">${(violations.length * 15).toFixed(2)}</span>
-              </div>
-              <div className="summary-card">
-                <span className="summary-label">Confirmed Fines</span>
-                <span className="summary-value">0</span>
-              </div>
+              <button className="filter-btn" onClick={clearViolations} title="Clear All">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
             </div>
 
-            <div className="panel-header">
-              <div className="history-header">
-                <h2>Violation Records</h2>
-                <button className="clear-all-btn" onClick={clearViolations}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="trash-icon"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
-                  Clear All
-                </button>
-              </div>
-              <span className="detection-count">{violations.length}</span>
-            </div>
-
-            <div className="history-grid">
+            <div className="card-grid">
               {violations.length === 0 ? (
-                <div className="empty-state">
-                  <p>No violations recorded yet.</p>
-                </div>
+                <div className="empty-state">No violations recorded yet.</div>
               ) : (
-                violations.map((v) => {
+                violations.map((v, idx) => {
                   const isVideo = v.video_path && v.video_path.endsWith('.webm');
                   const mediaUrl = v.video_path ? `${BACKEND_URL}/violations/${v.video_path.split('/').pop()}` : null;
-
-                  if (!mediaUrl) return null;
+                  
+                  let dateStr = v.timestamp;
+                  try {
+                    dateStr = new Date(v.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toLowerCase();
+                  } catch(e){}
 
                   return (
-                    <div className="violation-card" key={v.id}>
-                      <div className="card-media">
-                        {isVideo ? (
-                          <video src={mediaUrl} controls autoPlay muted loop />
-                        ) : (
-                          <img src={mediaUrl} alt="Violation" />
-                        )}
-                        <span className={`status-tag ${v.status.toLowerCase()}`}>{v.status}</span>
-                      </div>
-                      <div className="card-details">
-                        <h3>{v.vehicle_type} - {v.type}</h3>
-                        <p>{v.timestamp}</p>
-
-                        {v.ai_analysis && (
-                          <div className="ai-insight">
-                            <span className="insight-label">AI Analysis:</span>
-                            <p className="insight-text">{v.ai_analysis}</p>
-                          </div>
-                        )}
-
-                        <div className="card-footer">
-                          <span className="reward-info">Potential Reward: $15.00</span>
-                          {v.videodb_url && (
-                            <div className="violation-actions">
-                              <a href={v.videodb_url} target="_blank" rel="noopener noreferrer" className="portal-btn">
-                                Submit to Portal
-                              </a>
-                              <button className="card-delete-btn" onClick={() => deleteViolation(v.id)} title="Delete Record">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
-                              </button>
-                            </div>
-                          )}
+                    <div className="result-card" key={v.id}>
+                      <div className="result-card-header">
+                        <div className="result-logo">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                          <span>{v.vehicle_type}</span>
                         </div>
+                        <button className="info-btn" onClick={() => deleteViolation(v.id)} title="Delete Record">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
                       </div>
+
+                      <div className="result-card-body">
+                        <h3 className="result-title">
+                          {v.type}
+                          {idx === 0 && <span className="new-badge">New</span>}
+                        </h3>
+                        <span className="result-date">{dateStr}</span>
+                      </div>
+                      
+                      {mediaUrl && (
+                        isVideo ? (
+                          <video className="media-preview" src={mediaUrl} controls autoPlay muted loop />
+                        ) : (
+                          <img className="media-preview" src={mediaUrl} alt="Violation" />
+                        )
+                      )}
                     </div>
                   );
                 })
